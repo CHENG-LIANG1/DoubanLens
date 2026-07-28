@@ -17,6 +17,37 @@ app.use("/api/trpc/*", async (c) => {
     createContext,
   });
 });
+
+// 豆瓣封面图代理：仅限 doubanio 图片域名，解决防盗链 418/403
+app.get("/api/img", async (c) => {
+  const url = c.req.query("url") ?? "";
+  if (!/^https:\/\/img\d\.doubanio\.com\//.test(url)) {
+    return c.json({ error: "invalid url" }, 400);
+  }
+  try {
+    const upstream = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        Referer: "https://www.douban.com/",
+        Accept: "image/avif,image/webp,image/*,*/*;q=0.8",
+      },
+    });
+    if (!upstream.ok || !upstream.body) {
+      return c.json({ error: `upstream ${upstream.status}` }, 502);
+    }
+    return new Response(upstream.body, {
+      status: 200,
+      headers: {
+        "Content-Type": upstream.headers.get("Content-Type") ?? "image/jpeg",
+        "Cache-Control": "public, max-age=86400",
+      },
+    });
+  } catch {
+    return c.json({ error: "fetch failed" }, 502);
+  }
+});
+
 app.all("/api/*", (c) => c.json({ error: "Not Found" }, 404));
 
 export default app;
