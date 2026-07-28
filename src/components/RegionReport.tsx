@@ -98,7 +98,7 @@ export function RegionReport({ items }: { items: MediaItem[] }) {
                 key={r.name}
                 className={
                   i < 3
-                    ? "bg-emerald-600/90 text-white hover:bg-emerald-600"
+                    ? "bg-emerald-500/90 text-emerald-950 hover:bg-emerald-500"
                     : "bg-zinc-800 text-zinc-300 hover:bg-zinc-800"
                 }
               >

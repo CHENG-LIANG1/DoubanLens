@@ -103,7 +103,7 @@ export function ReportPanel({
           <Button
             onClick={runAi}
             disabled={!apiKey.trim() || analyze.isPending}
-            className="h-9 bg-emerald-600 text-sm hover:bg-emerald-500"
+            className="h-9 text-sm btn-glow bg-emerald-500 font-medium text-emerald-950 hover:bg-emerald-400"
           >
             {analyze.isPending ? (
               <>
@@ -124,7 +124,7 @@ export function ReportPanel({
           variant="outline"
           size="sm"
           onClick={download}
-          className="border-zinc-700 text-zinc-300 hover:border-emerald-600 hover:text-emerald-400"
+          className="btn-secondary"
         >
           <Download className="mr-1.5 h-3.5 w-3.5" />
           下载 Markdown{aiMarkdown ? "（含 AI 解读）" : ""}
@@ -133,7 +133,7 @@ export function ReportPanel({
           variant="outline"
           size="sm"
           onClick={copy}
-          className="border-zinc-700 text-zinc-300 hover:border-emerald-600 hover:text-emerald-400"
+          className="btn-secondary"
         >
           <Copy className="mr-1.5 h-3.5 w-3.5" />
           复制全文

@@ -184,7 +184,7 @@ export function YearReport({ items }: { items: MediaItem[] }) {
                   <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500">
                     年度类型
                     {report.genreTop.slice(0, 4).map((g) => (
-                      <Badge key={g.name} className="bg-emerald-950/60 text-emerald-300 hover:bg-emerald-950/60">
+                      <Badge key={g.name} className="border border-emerald-800/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20">
                         {g.name}
                       </Badge>
                     ))}

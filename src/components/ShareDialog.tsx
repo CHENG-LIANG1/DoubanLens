@@ -114,7 +114,7 @@ export function ShareDialog({
         <Button
           variant="outline"
           size="sm"
-          className="border-emerald-700 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/50 hover:text-emerald-200"
+          className="btn-secondary text-emerald-300/90"
         >
           <Share2 className="mr-1.5 h-3.5 w-3.5" />
           分享
@@ -138,7 +138,7 @@ export function ShareDialog({
           <Button
             size="sm"
             onClick={copyLink}
-            className="h-9 bg-emerald-600 hover:bg-emerald-500"
+            className="h-9 btn-glow bg-emerald-500 font-medium text-emerald-950 hover:bg-emerald-400"
           >
             {copied ? (
               <>
@@ -171,7 +171,7 @@ export function ShareDialog({
         <Button
           onClick={downloadPoster}
           disabled={downloading}
-          className="w-full bg-emerald-600 hover:bg-emerald-500"
+          className="w-full btn-glow bg-emerald-500 font-medium text-emerald-950 hover:bg-emerald-400"
         >
           {downloading ? (
             <>

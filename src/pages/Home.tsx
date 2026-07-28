@@ -248,7 +248,7 @@ export default function Home() {
               <ShareDialog userName={userName} doubanId={doubanId} results={results} />
               <button
                 onClick={() => scrape(doubanId)}
-                className="flex items-center gap-1.5 rounded-full border border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:border-emerald-600 hover:text-emerald-400"
+                className="btn-secondary flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs"
                 title="重新抓取最新数据"
               >
                 <RefreshCcw className="h-3 w-3" />
@@ -256,7 +256,7 @@ export default function Home() {
               </button>
               <button
                 onClick={reset}
-                className="flex items-center gap-1.5 rounded-full border border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:border-emerald-600 hover:text-emerald-400"
+                className="btn-secondary flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs"
               >
                 <RotateCcw className="h-3 w-3" />
                 换个 ID

@@ -133,7 +133,7 @@ export function ItemExplorer({ items }: { items: MediaItem[] }) {
           {filtered.slice(0, showCount).map((i) => (
             <div
               key={i.category + i.subjectId}
-              className="group overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/50 transition-colors hover:border-zinc-600"
+              className="group overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/50 transition-all hover:-translate-y-0.5 hover:border-emerald-700/50"
             >
               <div className="relative aspect-[2/3] overflow-hidden">
                 <CoverImage
@@ -152,7 +152,7 @@ export function ItemExplorer({ items }: { items: MediaItem[] }) {
                   href={i.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-start gap-1 text-sm font-medium leading-snug text-zinc-200 hover:text-emerald-400"
+                  className="flex items-start gap-1 text-sm font-medium leading-snug text-zinc-200 hover:text-emerald-300"
                 >
                   <span className="line-clamp-2 flex-1">{i.mainTitle}</span>
                   <ExternalLink className="mt-0.5 h-3 w-3 shrink-0 text-zinc-600" />
@@ -191,7 +191,7 @@ export function ItemExplorer({ items }: { items: MediaItem[] }) {
         <div className="text-center">
           <button
             onClick={() => setShowCount((c) => c + 120)}
-            className="rounded-lg border border-zinc-700 px-6 py-2 text-sm text-zinc-400 transition-colors hover:border-emerald-600 hover:text-emerald-400"
+            className="btn-secondary rounded-full px-6 py-2 text-sm"
           >
             加载更多（还有 {filtered.length - showCount} 条）
           </button>
