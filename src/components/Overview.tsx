@@ -40,7 +40,7 @@ function ChartCard({
   className?: string;
 }) {
   return (
-    <div className={`rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 ${className}`}>
+    <div className={`rounded-xl bento border border-zinc-800 bg-zinc-900/50 p-4 ${className}`}>
       <h3 className="mb-3 text-sm font-medium text-zinc-400">{title}</h3>
       {children}
     </div>
@@ -129,7 +129,7 @@ export function Overview({
           return (
             <div
               key={s.category}
-              className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4"
+              className="rounded-xl bento border border-zinc-800 bg-zinc-900/50 p-4"
             >
               <div className="flex items-center gap-2 text-xs text-zinc-500">
                 <Icon className="h-3.5 w-3.5" />

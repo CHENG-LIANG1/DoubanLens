@@ -1,9 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
-import { Book, CalendarDays, CheckCircle2, Clapperboard, FileText, Globe2, Heart, LayoutDashboard, Loader2, Music3, RotateCcw, XCircle } from "lucide-react";
+import {
+  Book, CalendarDays, CheckCircle2, Clapperboard, Clock3, FileText, Globe2,
+  Heart, History, LayoutDashboard, Loader2, Music3, RefreshCcw, RotateCcw, XCircle,
+} from "lucide-react";
 import type { Category, CategoryResult, MediaItem } from "@contracts/types";
 import { trpc } from "@/providers/trpc";
 import { allItems, CATEGORY_LABEL, computeStats } from "@/lib/stats";
+import {
+  formatSavedAt, loadRecord, loadRecent, pushRecent, saveRecord, type RecentEntry,
+} from "@/lib/cache";
 import { ScrapeForm } from "@/components/ScrapeForm";
 import { Overview } from "@/components/Overview";
 import { ItemExplorer } from "@/components/ItemExplorer";
@@ -23,20 +29,37 @@ const CATEGORY_ICON: Record<Category, typeof Clapperboard> = {
   music: Music3,
 };
 
+const FEATURES = [
+  "评分分布", "类型雷达", "地区热力图", "年度报告", "观影偏好",
+  "AI 深度解读", "分享海报", "五星墙", "打卡 streak", "Markdown 导出",
+];
+
 export default function Home() {
   const [stage, setStage] = useState<Stage>("idle");
   const [doubanId, setDoubanId] = useState("");
   const [results, setResults] = useState<Partial<Record<Category, CategoryResult | null>>>({});
   const [currentCat, setCurrentCat] = useState<Category | null>(null);
   const [live, setLive] = useState<Partial<Record<Category, { fetched: number; total: number }>>>({});
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [recents, setRecents] = useState<RecentEntry[]>([]);
+  const [cachedId, setCachedId] = useState("");
 
   const chunkMut = trpc.douban.scrapeChunk.useMutation();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  const loadFromCache = (rec: NonNullable<ReturnType<typeof loadRecord>>) => {
+    setDoubanId(rec.doubanId);
+    setResults(rec.results);
+    setSavedAt(rec.savedAt);
+    setStage("done");
+    setSearchParams({ id: rec.doubanId }, { replace: true });
+  };
 
   const scrape = async (id: string, cookie?: string) => {
     setStage("loading");
     setResults({});
     setLive({});
+    setSavedAt(null);
     setDoubanId(id);
 
     for (const cat of CATEGORY_ORDER) {
@@ -58,11 +81,8 @@ export default function Home() {
             start,
           });
           if (!r.ok) {
-            if (acc.length === 0) {
-              fatal = r.error ?? "抓取失败";
-            } else {
-              note = r.error;
-            }
+            if (acc.length === 0) fatal = r.error ?? "抓取失败";
+            else note = r.error;
             break;
           }
           userName ??= r.userName;
@@ -105,15 +125,42 @@ export default function Home() {
     }
     setCurrentCat(null);
     setStage("done");
-    // 同步 ?id= 到地址栏，方便直接复制分享
     setSearchParams({ id }, { replace: true });
   };
 
-  // 支持 ?id=xxx 分享链接：打开即自动抓取
+  // 抓取完成后写入 localStorage 缓存
   useEffect(() => {
-    const shared = searchParams.get("id");
-    if (shared && stage === "idle") {
-      scrape(shared);
+    if (stage !== "done" || !doubanId) return;
+    const hasData = CATEGORY_ORDER.some((c) => (results[c]?.fetched ?? 0) > 0);
+    if (!hasData || savedAt) return;
+    const name =
+      CATEGORY_ORDER.map((c) => results[c]?.userName).find(Boolean) ?? doubanId;
+    const total = CATEGORY_ORDER.reduce((s, c) => s + (results[c]?.fetched ?? 0), 0);
+    const rec = {
+      version: 1 as const,
+      doubanId,
+      userName: name,
+      results,
+      savedAt: Date.now(),
+    };
+    if (saveRecord(rec)) setSavedAt(rec.savedAt);
+    pushRecent({ doubanId, userName: name, savedAt: rec.savedAt, total });
+    setRecents(loadRecent());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, results]);
+
+  // 启动：分享链接 / 缓存直达
+  useEffect(() => {
+    const param = searchParams.get("id");
+    const cached = loadRecord();
+    setRecents(loadRecent());
+    if (cached) setCachedId(cached.doubanId);
+    if (param) {
+      if (cached && cached.doubanId === param) loadFromCache(cached);
+      else scrape(param);
+    } else if (cached) {
+      // 分析记录直达：打开即进入分析页
+      loadFromCache(cached);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -122,7 +169,17 @@ export default function Home() {
     setStage("idle");
     setResults({});
     setLive({});
+    setSavedAt(null);
     setDoubanId("");
+    setSearchParams({}, { replace: true });
+    const cached = loadRecord();
+    if (cached) setCachedId(cached.doubanId);
+  };
+
+  const openRecent = (entry: RecentEntry) => {
+    const cached = loadRecord();
+    if (cached && cached.doubanId === entry.doubanId) loadFromCache(cached);
+    else scrape(entry.doubanId);
   };
 
   const userName = useMemo(() => {
@@ -135,8 +192,9 @@ export default function Home() {
 
   const stats = useMemo(
     () =>
-      CATEGORY_ORDER.filter((c) => results[c]?.ok)
-        .map((c) => computeStats(c, results[c]!.items, results[c]!.total)),
+      CATEGORY_ORDER.filter((c) => results[c]?.ok).map((c) =>
+        computeStats(c, results[c]!.items, results[c]!.total),
+      ),
     [results],
   );
 
@@ -149,74 +207,131 @@ export default function Home() {
     !hasAnyItem &&
     CATEGORY_ORDER.every((c) => results[c] && !results[c]!.error && results[c]!.total === 0);
 
+  const tabCls =
+    "gap-1.5 rounded-full text-zinc-400 transition-all data-[state=active]:bg-emerald-500 data-[state=active]:text-emerald-950 data-[state=active]:font-medium";
+
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      {/* 背景纹理 */}
+    <div className="noise min-h-screen bg-[#09090b] text-zinc-100">
+      {/* 背景：网格 + 光晕 */}
       <div
-        className="pointer-events-none fixed inset-0 opacity-[0.15]"
+        className="pointer-events-none fixed inset-0"
         style={{
           backgroundImage:
-            "linear-gradient(rgba(52,211,153,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(52,211,153,0.08) 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
+            "linear-gradient(rgba(52,211,153,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(52,211,153,0.05) 1px, transparent 1px)",
+          backgroundSize: "56px 56px",
+          maskImage: "radial-gradient(ellipse 90% 60% at 50% 0%, black 30%, transparent 75%)",
+          WebkitMaskImage: "radial-gradient(ellipse 90% 60% at 50% 0%, black 30%, transparent 75%)",
         }}
       />
-      <div className="pointer-events-none fixed inset-x-0 top-0 h-96 bg-gradient-to-b from-emerald-950/40 to-transparent" />
+      <div className="pointer-events-none fixed -top-40 left-1/2 h-[480px] w-[820px] -translate-x-1/2 rounded-full bg-emerald-500/10 blur-[120px]" />
 
-      <div className="relative mx-auto max-w-6xl px-4 pb-20">
-        {/* 头部 */}
-        <header className="flex items-center justify-between py-6">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-sm font-bold text-white">
+      {/* 吸顶玻璃导航 */}
+      <header className="glass sticky top-0 z-40 border-b border-zinc-800/60">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
+          <button onClick={reset} className="flex items-center gap-2.5">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500 text-sm font-bold text-emerald-950">
               豆
             </div>
-            <span className="text-sm font-medium tracking-wide text-zinc-300">
-              豆瓣档案分析 Douban Lens
+            <span className="font-display text-sm font-medium tracking-wide text-zinc-200">
+              Douban Lens
             </span>
-          </div>
+            <span className="hidden text-xs text-zinc-600 sm:inline">豆瓣档案分析</span>
+          </button>
           {stage === "done" && hasAnyItem && (
             <div className="flex items-center gap-2">
+              {savedAt && (
+                <span className="hidden items-center gap-1 rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1 text-[11px] text-zinc-500 md:flex">
+                  <Clock3 className="h-3 w-3" />
+                  缓存于 {formatSavedAt(savedAt)}
+                </span>
+              )}
               <ShareDialog userName={userName} doubanId={doubanId} results={results} />
               <button
+                onClick={() => scrape(doubanId)}
+                className="flex items-center gap-1.5 rounded-full border border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:border-emerald-600 hover:text-emerald-400"
+                title="重新抓取最新数据"
+              >
+                <RefreshCcw className="h-3 w-3" />
+                重新分析
+              </button>
+              <button
                 onClick={reset}
-                className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:border-emerald-600 hover:text-emerald-400"
+                className="flex items-center gap-1.5 rounded-full border border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:border-emerald-600 hover:text-emerald-400"
               >
                 <RotateCcw className="h-3 w-3" />
-                重新查询
+                换个 ID
               </button>
             </div>
           )}
-        </header>
+        </div>
+      </header>
 
+      <div className="relative mx-auto max-w-6xl px-4 pb-20">
         {stage === "idle" && (
-          <div className="pb-10 pt-16 text-center md:pt-24">
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-emerald-800/60 bg-emerald-950/40 px-4 py-1.5 text-xs text-emerald-400">
+          <div className="pb-16 pt-20 text-center md:pt-28">
+            <div className="anim-fade-up mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-1.5 text-xs text-emerald-300">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-              基于豆瓣公开档案 · 书影音三合一
+              书影音三合一 · 基于豆瓣公开档案
             </div>
-            <h1 className="mx-auto max-w-3xl text-4xl font-bold leading-tight tracking-tight md:text-5xl">
-              一个 ID，看穿 TA 的
-              <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
-                书影音宇宙
-              </span>
+            <h1 className="anim-fade-up anim-delay-1 mx-auto max-w-4xl font-display text-5xl font-bold leading-[1.08] tracking-tight md:text-7xl">
+              一个 ID，
+              <br />
+              看穿 TA 的
+              <span className="text-shimmer">书影音宇宙</span>
             </h1>
-            <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-zinc-500">
-              拉取全部「看过 / 读过 / 听过」条目，可筛选浏览，并自动生成含评分分布、类型偏好、
-              活跃度与 AI 深度解读的完整分析报告。
+            <p className="anim-fade-up anim-delay-2 mx-auto mt-6 max-w-xl text-sm leading-relaxed text-zinc-500 md:text-base">
+              拉取全部「看过 / 读过 / 听过」，可筛选浏览，
+              <br className="hidden md:block" />
+              自动生成评分、类型、地区、年度报告与 AI 深度解读。
             </p>
-            <div className="mt-8">
-              <ScrapeForm loading={false} onSubmit={scrape} />
+            <div className="anim-fade-up anim-delay-3 mt-10">
+              <ScrapeForm loading={false} defaultId={cachedId} onSubmit={scrape} />
             </div>
-            <p className="mt-4 text-xs text-zinc-600">
-              仅支持公开档案；条目较多时需要 1-2 分钟，请耐心等待
-            </p>
+
+            {/* 最近分析记录 */}
+            {recents.length > 0 && (
+              <div className="anim-fade-up anim-delay-4 mt-6 flex flex-wrap items-center justify-center gap-2">
+                <span className="flex items-center gap-1 text-xs text-zinc-600">
+                  <History className="h-3 w-3" />
+                  最近分析
+                </span>
+                {recents.slice(0, 4).map((r) => (
+                  <button
+                    key={r.doubanId}
+                    onClick={() => openRecent(r)}
+                    className="rounded-full border border-zinc-800 bg-zinc-900/60 px-3.5 py-1.5 text-xs text-zinc-400 transition-all hover:-translate-y-0.5 hover:border-emerald-600/60 hover:text-emerald-300"
+                  >
+                    {r.userName}
+                    <span className="ml-1.5 text-zinc-600">{r.total} 条</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* 特性跑马灯 */}
+            <div className="anim-fade-in anim-delay-5 relative mt-20 overflow-hidden [mask-image:linear-gradient(90deg,transparent,black_15%,black_85%,transparent)]">
+              <div
+                className="flex w-max gap-3"
+                style={{ animation: "marquee-x 30s linear infinite" }}
+              >
+                {[...FEATURES, ...FEATURES].map((f, i) => (
+                  <span
+                    key={i}
+                    className="whitespace-nowrap rounded-full border border-zinc-800/80 bg-zinc-900/40 px-5 py-2 text-xs text-zinc-500"
+                  >
+                    {f}
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
         {stage !== "idle" && (
-          <div className="pt-6">
+          <div className="pt-8">
             {/* 抓取进度 */}
             <div className="mb-6 grid gap-3 md:grid-cols-3">
-              {CATEGORY_ORDER.map((cat) => {
+              {CATEGORY_ORDER.map((cat, idx) => {
                 const Icon = CATEGORY_ICON[cat];
                 const r = results[cat];
                 const isLoading = stage === "loading" && currentCat === cat;
@@ -224,10 +339,10 @@ export default function Home() {
                 return (
                   <div
                     key={cat}
-                    className={`rounded-xl border p-4 transition-colors ${
+                    className={`anim-fade-up anim-delay-${idx + 1} rounded-2xl border p-4 transition-colors ${
                       isLoading
                         ? "border-emerald-700/60 bg-emerald-950/20"
-                        : "border-zinc-800 bg-zinc-900/50"
+                        : "border-zinc-800/80 bg-zinc-900/50"
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -247,7 +362,7 @@ export default function Home() {
                         <span className="text-xs text-zinc-600">等待</span>
                       )}
                     </div>
-                    <div className="mt-2 text-2xl font-bold">
+                    <div className="num mt-2 text-2xl font-bold">
                       {isLoading ? (
                         <>
                           <span className="text-emerald-400">{liveInfo?.fetched ?? 0}</span>
@@ -279,9 +394,9 @@ export default function Home() {
                       )}
                     </div>
                     {isLoading && liveInfo?.total ? (
-                      <div className="mt-2 h-1 overflow-hidden rounded bg-zinc-800">
+                      <div className="mt-2 h-1 overflow-hidden rounded-full bg-zinc-800">
                         <div
-                          className="h-full rounded bg-emerald-500 transition-all duration-500"
+                          className="h-full rounded-full bg-emerald-500 transition-all duration-500"
                           style={{
                             width: `${Math.min(100, (liveInfo.fetched / Math.max(liveInfo.total, 1)) * 100)}%`,
                           }}
@@ -299,7 +414,7 @@ export default function Home() {
             </div>
 
             {stage === "done" && !hasAnyItem && (
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-10 text-center">
+              <div className="anim-fade-up rounded-2xl border border-zinc-800/80 bg-zinc-900/50 p-10 text-center">
                 {allEmpty ? (
                   <>
                     <p className="text-zinc-300">该用户暂无公开的书影音标记</p>
@@ -317,7 +432,7 @@ export default function Home() {
                 )}
                 <button
                   onClick={reset}
-                  className="mt-5 rounded-lg bg-emerald-600 px-5 py-2 text-sm text-white hover:bg-emerald-500"
+                  className="btn-glow mt-5 rounded-xl bg-emerald-500 px-5 py-2 text-sm font-medium text-emerald-950 hover:bg-emerald-400"
                 >
                   换个 ID 试试
                 </button>
@@ -325,110 +440,93 @@ export default function Home() {
             )}
 
             {stage === "done" && hasAnyItem && (
-              <>
-                <h2 className="mb-4 text-xl font-semibold">
-                  <span className="text-emerald-400">{userName}</span>
+              <div className="anim-fade-up anim-delay-2">
+                <h2 className="mb-5 font-display text-2xl font-semibold tracking-tight md:text-3xl">
+                  <span className="text-shimmer">{userName}</span>
                   <span className="ml-2 text-sm font-normal text-zinc-500">
                     的书影音档案（{stats.reduce((s, x) => s + x.fetched, 0)} 条）
                   </span>
                 </h2>
                 <Tabs defaultValue="overview">
-                  <TabsList className="mb-5 h-auto flex-wrap justify-start gap-1 bg-zinc-900/80 border border-zinc-800 p-1">
-                    <TabsTrigger
-                      value="overview"
-                      className="gap-1.5 text-zinc-400 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
-                    >
+                  <TabsList className="mb-6 h-auto flex-wrap justify-start gap-1 rounded-full border border-zinc-800/80 bg-zinc-900/60 p-1.5">
+                    <TabsTrigger value="overview" className={tabCls}>
                       <LayoutDashboard className="h-3.5 w-3.5" />
                       总览
                     </TabsTrigger>
                     {CATEGORY_ORDER.filter((c) => (results[c]?.fetched ?? 0) > 0).map((c) => {
                       const Icon = CATEGORY_ICON[c];
                       return (
-                        <TabsTrigger
-                          key={c}
-                          value={c}
-                          className="gap-1.5 text-zinc-400 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
-                        >
+                        <TabsTrigger key={c} value={c} className={tabCls}>
                           <Icon className="h-3.5 w-3.5" />
                           {CATEGORY_LABEL[c]}
                         </TabsTrigger>
                       );
                     })}
                     {hasMovies && (
-                      <TabsTrigger
-                        value="preference"
-                        className="gap-1.5 text-zinc-400 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
-                      >
+                      <TabsTrigger value="preference" className={tabCls}>
                         <Heart className="h-3.5 w-3.5" />
                         观影偏好
                       </TabsTrigger>
                     )}
                     {hasMovies && (
-                      <TabsTrigger
-                        value="region"
-                        className="gap-1.5 text-zinc-400 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
-                      >
+                      <TabsTrigger value="region" className={tabCls}>
                         <Globe2 className="h-3.5 w-3.5" />
                         地区报告
                       </TabsTrigger>
                     )}
-                    <TabsTrigger
-                      value="year"
-                      className="gap-1.5 text-zinc-400 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
-                    >
+                    <TabsTrigger value="year" className={tabCls}>
                       <CalendarDays className="h-3.5 w-3.5" />
                       年度报告
                     </TabsTrigger>
-                    <TabsTrigger
-                      value="report"
-                      className="gap-1.5 text-zinc-400 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
-                    >
+                    <TabsTrigger value="report" className={tabCls}>
                       <FileText className="h-3.5 w-3.5" />
                       分析报告
                     </TabsTrigger>
                   </TabsList>
 
-                  <TabsContent value="overview">
-                    <Overview results={results} stats={stats} />
-                  </TabsContent>
-                  {CATEGORY_ORDER.filter((c) => (results[c]?.fetched ?? 0) > 0).map((c) => (
-                    <TabsContent key={c} value={c}>
-                      <ItemExplorer items={results[c]!.items} />
+                  <div className="tab-anim">
+                    <TabsContent value="overview">
+                      <Overview results={results} stats={stats} />
                     </TabsContent>
-                  ))}
-                  {hasMovies && (
-                    <TabsContent value="preference">
-                      <MoviePreference items={items} />
+                    {CATEGORY_ORDER.filter((c) => (results[c]?.fetched ?? 0) > 0).map((c) => (
+                      <TabsContent key={c} value={c}>
+                        <ItemExplorer items={results[c]!.items} />
+                      </TabsContent>
+                    ))}
+                    {hasMovies && (
+                      <TabsContent value="preference">
+                        <MoviePreference items={items} />
+                      </TabsContent>
+                    )}
+                    {hasMovies && (
+                      <TabsContent value="region">
+                        <RegionReport items={items} />
+                      </TabsContent>
+                    )}
+                    <TabsContent value="year">
+                      <YearReport items={items} />
                     </TabsContent>
-                  )}
-                  {hasMovies && (
-                    <TabsContent value="region">
-                      <RegionReport items={items} />
+                    <TabsContent value="report">
+                      <ReportPanel
+                        userName={userName}
+                        doubanId={doubanId}
+                        results={results}
+                        stats={stats}
+                      />
                     </TabsContent>
-                  )}
-                  <TabsContent value="year">
-                    <YearReport items={items} />
-                  </TabsContent>
-                  <TabsContent value="report">
-                    <ReportPanel
-                      userName={userName}
-                      doubanId={doubanId}
-                      results={results}
-                      stats={stats}
-                    />
-                  </TabsContent>
+                  </div>
                 </Tabs>
                 {okCount < CATEGORY_ORDER.length && (
                   <p className="mt-4 text-xs text-zinc-600">
                     部分类别抓取失败或被限流，数据可能不完整；填 Cookie 后重新查询可提高成功率。
                   </p>
                 )}
-              </>
+              </div>
             )}
           </div>
         )}
 
-        <footer className="mt-16 border-t border-zinc-900 pt-6 text-center text-xs text-zinc-600">
+        <footer className="mt-20 border-t border-zinc-900 pt-6 text-center text-xs text-zinc-700">
           数据来自豆瓣公开档案页 · 仅供个人学习娱乐使用 · 与豆瓣官方无关
         </footer>
       </div>

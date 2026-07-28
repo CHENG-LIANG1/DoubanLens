@@ -1,3 +1,7 @@
+@import "@fontsource/space-grotesk/400.css";
+@import "@fontsource/space-grotesk/500.css";
+@import "@fontsource/space-grotesk/700.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -59,7 +63,7 @@
     --sidebar-primary: 224.3 76.3% 48%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
@@ -71,5 +75,202 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
+  ::selection {
+    background: rgba(52, 211, 153, 0.28);
+    color: #ecfdf5;
+  }
+  /* 细滚动条 */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #27272a;
+    border-radius: 8px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3f3f46;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  }
+  /* 数字统一用等宽风格展示字体 */
+  .num {
+    font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+}
+
+/* ---------------- 动效 ---------------- */
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translateY(0) rotate(var(--float-rotate, 0deg));
+  }
+  50% {
+    transform: translateY(-14px) rotate(var(--float-rotate, 0deg));
+  }
+}
+
+@keyframes shimmer-text {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes marquee-x {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.anim-fade-up {
+  animation: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.anim-fade-in {
+  animation: fade-in 0.6s ease both;
+}
+.anim-float-slow {
+  animation: float-slow 7s ease-in-out infinite;
+}
+.anim-delay-1 {
+  animation-delay: 0.08s;
+}
+.anim-delay-2 {
+  animation-delay: 0.16s;
+}
+.anim-delay-3 {
+  animation-delay: 0.24s;
+}
+.anim-delay-4 {
+  animation-delay: 0.32s;
+}
+.anim-delay-5 {
+  animation-delay: 0.4s;
+}
+
+/* 渐变流光标题 */
+.text-shimmer {
+  background: linear-gradient(
+    110deg,
+    #34d399 20%,
+    #a7f3d0 38%,
+    #5eead4 50%,
+    #34d399 65%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer-text 5s ease-in-out infinite;
+}
+
+/* 噪点纹理 */
+.noise::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Bento 卡片 hover 发光 */
+.bento {
+  position: relative;
+  transition:
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.35s,
+    box-shadow 0.35s;
+}
+.bento:hover {
+  transform: translateY(-2px);
+  border-color: rgba(52, 211, 153, 0.35);
+  box-shadow:
+    0 0 0 1px rgba(52, 211, 153, 0.12),
+    0 12px 40px -12px rgba(52, 211, 153, 0.15);
+}
+
+/* 玻璃拟态 */
+.glass {
+  background: rgba(24, 24, 27, 0.6);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+}
+
+/* 主按钮发光 */
+.btn-glow {
+  box-shadow:
+    0 0 0 1px rgba(52, 211, 153, 0.25),
+    0 8px 28px -8px rgba(16, 185, 129, 0.55);
+  transition:
+    box-shadow 0.3s,
+    transform 0.2s,
+    background-color 0.2s;
+}
+.btn-glow:hover {
+  box-shadow:
+    0 0 0 1px rgba(52, 211, 153, 0.45),
+    0 12px 36px -6px rgba(16, 185, 129, 0.7);
+  transform: translateY(-1px);
+}
+.btn-glow:active {
+  transform: translateY(0);
+}
+
+/* Tab 切换内容淡入 */
+.tab-anim {
+  animation: fade-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
