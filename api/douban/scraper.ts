@@ -1,5 +1,5 @@
 import * as cheerio from "cheerio";
-import type { Category, CategoryResult, MediaItem } from "../../contracts/types";
+import type { Category, MediaItem } from "../../contracts/types";
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
@@ -10,8 +10,11 @@ const CATEGORY_HOST: Record<Category, string> = {
   music: "https://music.douban.com",
 };
 
-const MAX_PAGES = 120;
-const PAGE_DELAY_MS = 450;
+/** 单个分块最多抓几页（控制单次请求时长，避免网关超时） */
+const PAGES_PER_CHUNK = 3;
+/** 全局页数上限（15 条/页） */
+const MAX_PAGES = 200;
+const PAGE_DELAY_MS = 400;
 
 /** 豆瓣电影官方类型词表，用于从 intro 里精确匹配 */
 const MOVIE_GENRES = [
@@ -112,7 +115,8 @@ function parseTitleMeta($: cheerio.CheerioAPI): { userName?: string; total: numb
   return { userName, total };
 }
 
-function parseMoviePage($: cheerio.CheerioAPI): MediaItem[] {
+/** 电影 & 音乐：grid 模式（grid-view 结构，带封面） */
+function parseGridPage($: cheerio.CheerioAPI, category: "movie" | "music"): MediaItem[] {
   const items: MediaItem[] = [];
   $("div.grid-view div.item").each((_, el) => {
     const node = $(el);
@@ -132,28 +136,46 @@ function parseMoviePage($: cheerio.CheerioAPI): MediaItem[] {
       .replace(/\s+/g, " ")
       .trim();
     const tags = parseTags(node.find("span.tags, li.tags").first().text());
+
+    let creator: string | undefined;
+    let genres: string[] = [];
+    let regions: string[] = [];
+    if (category === "movie") {
+      genres = intro ? matchKeywords(intro, MOVIE_GENRES) : [];
+      regions = intro ? matchKeywords(intro, REGIONS) : [];
+    } else if (intro) {
+      // 音乐 intro：表演者 / 发行日期 / 专辑 / 介质 / 流派
+      const segs = intro.split("/").map((s) => s.trim()).filter(Boolean);
+      creator = segs[0];
+      const last = segs[segs.length - 1];
+      if (segs.length >= 2 && last && !/^\d{4}/.test(last) && last !== creator) {
+        genres = [last];
+      }
+    }
+
     items.push({
       subjectId: idMatch[1],
       title: fullTitle || em,
       mainTitle: em || fullTitle.split("/")[0].trim(),
       url,
       cover: node.find("div.pic img").first().attr("src") || undefined,
-      category: "movie",
+      category,
       rating,
       date,
       comment: comment || undefined,
       tags,
       intro: intro || undefined,
       year: intro ? extractYear(intro) : undefined,
-      genres: intro ? matchKeywords(intro, MOVIE_GENRES) : [],
-      regions: intro ? matchKeywords(intro, REGIONS) : [],
+      creator,
+      genres,
+      regions,
     });
   });
   return items;
 }
 
-/** 书籍 / 音乐 grid 模式（interest-list 结构） */
-function parseSubjectPage($: cheerio.CheerioAPI, category: "book" | "music"): MediaItem[] {
+/** 书籍：grid 模式（interest-list 结构） */
+function parseBookPage($: cheerio.CheerioAPI): MediaItem[] {
   const items: MediaItem[] = [];
   $("ul.interest-list li.subject-item, ul.subject-list li.subject-item").each((_, el) => {
     const node = $(el);
@@ -181,7 +203,7 @@ function parseSubjectPage($: cheerio.CheerioAPI, category: "book" | "music"): Me
       mainTitle,
       url,
       cover: node.find("div.pic img").first().attr("src") || undefined,
-      category,
+      category: "book",
       rating,
       date,
       comment: comment || undefined,
@@ -194,9 +216,14 @@ function parseSubjectPage($: cheerio.CheerioAPI, category: "book" | "music"): Me
   return items;
 }
 
+function parsePage($: cheerio.CheerioAPI, category: Category): MediaItem[] {
+  if (category === "book") return parseBookPage($);
+  return parseGridPage($, category);
+}
+
 async function fetchHtml(url: string, host: string, cookie?: string) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
+  const timer = setTimeout(() => controller.abort(), 15000);
   try {
     const res = await fetch(url, {
       headers: buildHeaders(host, cookie),
@@ -210,87 +237,120 @@ async function fetchHtml(url: string, host: string, cookie?: string) {
   }
 }
 
-export async function scrapeCategory(
+export interface ChunkResult {
+  category: Category;
+  ok: boolean;
+  userName?: string;
+  total: number;
+  /** 本块起始 start 值 */
+  start: number;
+  /** 下一块的 start；done 时无意义 */
+  nextStart: number;
+  /** 是否已全部抓完（或触及上限/被拦截） */
+  done: boolean;
+  items: MediaItem[];
+  /** 致命错误（ok=false 时）或提示性信息（部分隐藏/触及上限等） */
+  error?: string;
+}
+
+/**
+ * 分批抓取：每次最多 PAGES_PER_CHUNK 页，前端循环调用直至 done。
+ */
+export async function scrapeChunk(
   category: Category,
   doubanId: string,
+  start: number,
   cookie?: string,
-): Promise<CategoryResult> {
+): Promise<ChunkResult> {
   const host = CATEGORY_HOST[category];
   const items: MediaItem[] = [];
   let userName: string | undefined;
   let total = 0;
+  const base: Omit<ChunkResult, "ok" | "items" | "nextStart" | "done"> = {
+    category,
+    total: 0,
+    start,
+  };
 
-  const first = await fetchHtml(pageUrl(category, doubanId, 0), host, cookie);
+  // 第一页（含元信息解析与风控检测）
+  const first = await fetchHtml(pageUrl(category, doubanId, start), host, cookie);
   const $first = cheerio.load(first.html);
   const blockErr = detectBlock($first, first.status, first.html);
   if (blockErr) {
-    return { category, ok: false, total: 0, fetched: 0, items: [], error: blockErr };
+    return { ...base, ok: false, nextStart: start, done: true, items: [], error: blockErr };
   }
-  const meta = parseTitleMeta($first);
-  userName = meta.userName;
-  total = meta.total;
-
-  const firstItems =
-    category === "movie" ? parseMoviePage($first) : parseSubjectPage($first, category);
+  if (start === 0) {
+    const meta = parseTitleMeta($first);
+    userName = meta.userName;
+    total = meta.total;
+  }
+  const firstItems = parsePage($first, category);
   items.push(...firstItems);
 
-  if (total > 0 && items.length === 0) {
+  // start=0 时若标题显示有数量却一条都解析不到，视为私密/异常
+  if (start === 0 && total > 0 && firstItems.length === 0) {
     return {
-      category,
+      ...base,
       ok: false,
       userName,
       total,
-      fetched: 0,
+      nextStart: start,
+      done: true,
       items: [],
       error: "页面可访问但未解析到条目，该用户的档案可能设为私密",
     };
   }
 
-  const seen = new Set(items.map((i) => i.subjectId));
-  let consecutiveEmpty = 0;
-  for (let page = 1; page < MAX_PAGES; page++) {
-    const start = page * 15;
-    if (total > 0 && start >= total) break;
+  let nextStart = start + 15;
+  let emptyStreak = firstItems.length === 0 ? 1 : 0;
+  let blockedNote: string | undefined;
+
+  // 继续抓本块剩余页
+  for (let p = 1; p < PAGES_PER_CHUNK; p++) {
+    const cur = start + p * 15;
+    if (total > 0 && cur >= total) break;
+    if (cur >= MAX_PAGES * 15) break;
     await sleep(PAGE_DELAY_MS);
-    const { status, html } = await fetchHtml(pageUrl(category, doubanId, start), host, cookie);
+    const { status, html } = await fetchHtml(pageUrl(category, doubanId, cur), host, cookie);
     if (status !== 200) {
-      // 中途被风控：保留已抓到的数据，标记部分成功
-      return {
-        category,
-        ok: items.length > 0,
-        userName,
-        total,
-        fetched: items.length,
-        items,
-        error: `第 ${page + 1} 页起被豆瓣拦截（HTTP ${status}），仅获取到前 ${items.length} 条`,
-      };
+      blockedNote = `第 ${cur / 15 + 1} 页起被豆瓣拦截（HTTP ${status}），仅获取到已抓取部分`;
+      nextStart = cur;
+      break;
     }
     const $ = cheerio.load(html);
-    const pageItems = category === "movie" ? parseMoviePage($) : parseSubjectPage($, category);
-    const fresh = pageItems.filter((i) => !seen.has(i.subjectId));
-    // 匿名访问时豆瓣会隐藏部分受限条目，单页少于 15 条不等于翻到底，
-    // 以「连续两页完全为空」或「start 超过总数」作为终止条件
+    const pageItems = parsePage($, category);
     if (pageItems.length === 0) {
-      consecutiveEmpty += 1;
-      if (consecutiveEmpty >= 2) break;
+      emptyStreak += 1;
     } else {
-      consecutiveEmpty = 0;
-      fresh.forEach((i) => seen.add(i.subjectId));
-      items.push(...fresh);
+      emptyStreak = 0;
+      items.push(...pageItems);
     }
+    nextStart = cur + 15;
+    if (emptyStreak >= 2) break;
   }
 
-  const hiddenNote =
-    total > 0 && items.length < total
-      ? `匿名访问有 ${total - items.length} 条被豆瓣隐藏（受限条目需登录可见，可填 Cookie 补全）`
-      : undefined;
-  return {
-    category,
-    ok: true,
-    userName,
-    total,
-    fetched: items.length,
-    items,
-    error: hiddenNote,
-  };
+  if (blockedNote) {
+    return {
+      ...base,
+      ok: true,
+      userName,
+      total,
+      nextStart,
+      done: true,
+      items,
+      error: blockedNote,
+    };
+  }
+
+  const done =
+    emptyStreak >= 2 ||
+    (total > 0 && nextStart >= total) ||
+    nextStart >= MAX_PAGES * 15;
+
+  let note: string | undefined;
+  if (done && nextStart >= MAX_PAGES * 15 && (total === 0 || nextStart < total)) {
+    note = `条目过多，仅抓取前 ${MAX_PAGES * 15} 条`;
+  }
+
+  return { ...base, ok: true, userName, total, nextStart, done, items, error: note };
 }

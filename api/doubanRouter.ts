@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createRouter, publicQuery } from "./middleware";
-import { scrapeCategory } from "./douban/scraper";
+import { scrapeChunk } from "./douban/scraper";
 import type { AnalyzeResult } from "../contracts/types";
 
 const scrapeInput = z.object({
@@ -11,6 +11,9 @@ const scrapeInput = z.object({
     .max(64)
     .regex(/^[\w.\-一-龥]+$/, "豆瓣 ID 格式不正确"),
   cookie: z.string().trim().max(4000).optional(),
+  category: z.enum(["movie", "book", "music"]),
+  /** 分页游标（每页 15 条） */
+  start: z.number().int().min(0).max(100000).default(0),
 });
 
 const analyzeInput = z.object({
@@ -28,15 +31,11 @@ const analyzeInput = z.object({
 });
 
 export const doubanRouter = createRouter({
-  scrapeMovie: publicQuery.input(scrapeInput).mutation(({ input }) =>
-    scrapeCategory("movie", input.doubanId, input.cookie),
-  ),
-  scrapeBook: publicQuery.input(scrapeInput).mutation(({ input }) =>
-    scrapeCategory("book", input.doubanId, input.cookie),
-  ),
-  scrapeMusic: publicQuery.input(scrapeInput).mutation(({ input }) =>
-    scrapeCategory("music", input.doubanId, input.cookie),
-  ),
+  scrapeChunk: publicQuery
+    .input(scrapeInput)
+    .mutation(({ input }) =>
+      scrapeChunk(input.category, input.doubanId, input.start, input.cookie),
+    ),
 
   analyze: publicQuery
     .input(analyzeInput)

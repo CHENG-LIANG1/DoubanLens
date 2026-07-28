@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Book, CheckCircle2, Clapperboard, FileText, LayoutDashboard, Loader2, Music3, RotateCcw, XCircle } from "lucide-react";
-import type { Category, CategoryResult } from "@contracts/types";
+import type { Category, CategoryResult, MediaItem } from "@contracts/types";
 import { trpc } from "@/providers/trpc";
 import { CATEGORY_LABEL, computeStats } from "@/lib/stats";
 import { ScrapeForm } from "@/components/ScrapeForm";
@@ -23,53 +23,89 @@ export default function Home() {
   const [doubanId, setDoubanId] = useState("");
   const [results, setResults] = useState<Partial<Record<Category, CategoryResult | null>>>({});
   const [currentCat, setCurrentCat] = useState<Category | null>(null);
-  const [fatal, setFatal] = useState("");
+  const [live, setLive] = useState<Partial<Record<Category, { fetched: number; total: number }>>>({});
 
-  const movieMut = trpc.douban.scrapeMovie.useMutation();
-  const bookMut = trpc.douban.scrapeBook.useMutation();
-  const musicMut = trpc.douban.scrapeMusic.useMutation();
+  const chunkMut = trpc.douban.scrapeChunk.useMutation();
 
   const scrape = async (id: string, cookie?: string) => {
     setStage("loading");
     setResults({});
-    setFatal("");
+    setLive({});
     setDoubanId(id);
-    const muts: Record<Category, typeof movieMut> = {
-      movie: movieMut,
-      book: bookMut,
-      music: musicMut,
-    };
-    try {
-      for (const cat of CATEGORY_ORDER) {
-        setCurrentCat(cat);
-        try {
-          const r = await muts[cat].mutateAsync({ doubanId: id, cookie });
-          setResults((prev) => ({ ...prev, [cat]: r }));
-        } catch (e) {
-          setResults((prev) => ({
-            ...prev,
-            [cat]: {
-              category: cat,
-              ok: false,
-              total: 0,
-              fetched: 0,
-              items: [],
-              error: e instanceof Error ? e.message : "请求失败",
-            },
-          }));
+
+    for (const cat of CATEGORY_ORDER) {
+      setCurrentCat(cat);
+      const acc: MediaItem[] = [];
+      const seen = new Set<string>();
+      let start = 0;
+      let userName: string | undefined;
+      let total = 0;
+      let note: string | undefined;
+      let fatal: string | undefined;
+
+      try {
+        for (;;) {
+          const r = await chunkMut.mutateAsync({
+            doubanId: id,
+            cookie,
+            category: cat,
+            start,
+          });
+          if (!r.ok) {
+            if (acc.length === 0) {
+              fatal = r.error ?? "抓取失败";
+            } else {
+              note = r.error;
+            }
+            break;
+          }
+          userName ??= r.userName;
+          if (r.total) total = r.total;
+          const fresh = r.items.filter((i) => !seen.has(i.subjectId));
+          fresh.forEach((i) => {
+            seen.add(i.subjectId);
+            acc.push(i);
+          });
+          setLive((p) => ({ ...p, [cat]: { fetched: acc.length, total } }));
+          if (r.error) note = r.error;
+          if (r.done) break;
+          start = r.nextStart;
         }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "请求失败";
+        if (acc.length === 0) fatal = msg;
+        else note = msg;
       }
-    } finally {
-      setCurrentCat(null);
-      setStage("done");
+
+      const hiddenNote =
+        !note && total > acc.length
+          ? `匿名访问有 ${total - acc.length} 条被豆瓣隐藏（受限条目需登录可见，可填 Cookie 补全）`
+          : undefined;
+
+      setResults((prev) => ({
+        ...prev,
+        [cat]: fatal
+          ? { category: cat, ok: false, total, fetched: 0, items: [], error: fatal }
+          : {
+              category: cat,
+              ok: true,
+              userName,
+              total,
+              fetched: acc.length,
+              items: acc,
+              error: note ?? hiddenNote,
+            },
+      }));
     }
+    setCurrentCat(null);
+    setStage("done");
   };
 
   const reset = () => {
     setStage("idle");
     setResults({});
+    setLive({});
     setDoubanId("");
-    setFatal("");
   };
 
   const userName = useMemo(() => {
@@ -162,6 +198,7 @@ export default function Home() {
                 const Icon = CATEGORY_ICON[cat];
                 const r = results[cat];
                 const isLoading = stage === "loading" && currentCat === cat;
+                const liveInfo = live[cat];
                 return (
                   <div
                     key={cat}
@@ -190,7 +227,17 @@ export default function Home() {
                     </div>
                     <div className="mt-2 text-2xl font-bold">
                       {isLoading ? (
-                        <span className="text-emerald-400">抓取中…</span>
+                        <>
+                          <span className="text-emerald-400">{liveInfo?.fetched ?? 0}</span>
+                          {liveInfo?.total ? (
+                            <span className="text-base font-normal text-zinc-500">
+                              /{liveInfo.total}
+                            </span>
+                          ) : null}
+                          <span className="ml-1 text-xs font-normal text-zinc-500">
+                            条 · 抓取中
+                          </span>
+                        </>
                       ) : r ? (
                         r.ok ? (
                           <>
@@ -209,6 +256,16 @@ export default function Home() {
                         <span className="text-zinc-700">—</span>
                       )}
                     </div>
+                    {isLoading && liveInfo?.total ? (
+                      <div className="mt-2 h-1 overflow-hidden rounded bg-zinc-800">
+                        <div
+                          className="h-full rounded bg-emerald-500 transition-all duration-500"
+                          style={{
+                            width: `${Math.min(100, (liveInfo.fetched / Math.max(liveInfo.total, 1)) * 100)}%`,
+                          }}
+                        />
+                      </div>
+                    ) : null}
                     {r?.error && (
                       <p className={`mt-1 text-[11px] leading-snug ${r.ok ? "text-amber-500/80" : "text-red-400/80"}`}>
                         {r.error}
@@ -230,7 +287,7 @@ export default function Home() {
                   </>
                 ) : (
                   <>
-                    <p className="text-zinc-300">{fatal || "未能获取到数据"}</p>
+                    <p className="text-zinc-300">未能获取到数据</p>
                     <p className="mt-2 text-sm text-zinc-500">
                       请检查豆瓣 ID 是否正确、对方档案是否公开；被风控时可在高级选项填入自己的豆瓣 Cookie
                     </p>
