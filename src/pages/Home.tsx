@@ -1,12 +1,17 @@
-import { useMemo, useState } from "react";
-import { Book, CheckCircle2, Clapperboard, FileText, LayoutDashboard, Loader2, Music3, RotateCcw, XCircle } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router";
+import { Book, CalendarDays, CheckCircle2, Clapperboard, FileText, Globe2, Heart, LayoutDashboard, Loader2, Music3, RotateCcw, XCircle } from "lucide-react";
 import type { Category, CategoryResult, MediaItem } from "@contracts/types";
 import { trpc } from "@/providers/trpc";
-import { CATEGORY_LABEL, computeStats } from "@/lib/stats";
+import { allItems, CATEGORY_LABEL, computeStats } from "@/lib/stats";
 import { ScrapeForm } from "@/components/ScrapeForm";
 import { Overview } from "@/components/Overview";
 import { ItemExplorer } from "@/components/ItemExplorer";
 import { ReportPanel } from "@/components/ReportPanel";
+import { ShareDialog } from "@/components/ShareDialog";
+import { MoviePreference } from "@/components/MoviePreference";
+import { RegionReport } from "@/components/RegionReport";
+import { YearReport } from "@/components/YearReport";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type Stage = "idle" | "loading" | "done";
@@ -26,6 +31,7 @@ export default function Home() {
   const [live, setLive] = useState<Partial<Record<Category, { fetched: number; total: number }>>>({});
 
   const chunkMut = trpc.douban.scrapeChunk.useMutation();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const scrape = async (id: string, cookie?: string) => {
     setStage("loading");
@@ -99,7 +105,18 @@ export default function Home() {
     }
     setCurrentCat(null);
     setStage("done");
+    // 同步 ?id= 到地址栏，方便直接复制分享
+    setSearchParams({ id }, { replace: true });
   };
+
+  // 支持 ?id=xxx 分享链接：打开即自动抓取
+  useEffect(() => {
+    const shared = searchParams.get("id");
+    if (shared && stage === "idle") {
+      scrape(shared);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const reset = () => {
     setStage("idle");
@@ -125,6 +142,8 @@ export default function Home() {
 
   const okCount = CATEGORY_ORDER.filter((c) => results[c]?.ok).length;
   const hasAnyItem = stats.some((s) => s.fetched > 0);
+  const items = useMemo(() => allItems(results), [results]);
+  const hasMovies = (results.movie?.fetched ?? 0) > 0;
   const allEmpty =
     stage === "done" &&
     !hasAnyItem &&
@@ -154,14 +173,17 @@ export default function Home() {
               豆瓣档案分析 Douban Lens
             </span>
           </div>
-          {stage === "done" && (
-            <button
-              onClick={reset}
-              className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:border-emerald-600 hover:text-emerald-400"
-            >
-              <RotateCcw className="h-3 w-3" />
-              重新查询
-            </button>
+          {stage === "done" && hasAnyItem && (
+            <div className="flex items-center gap-2">
+              <ShareDialog userName={userName} doubanId={doubanId} results={results} />
+              <button
+                onClick={reset}
+                className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:border-emerald-600 hover:text-emerald-400"
+              >
+                <RotateCcw className="h-3 w-3" />
+                重新查询
+              </button>
+            </div>
           )}
         </header>
 
@@ -311,7 +333,7 @@ export default function Home() {
                   </span>
                 </h2>
                 <Tabs defaultValue="overview">
-                  <TabsList className="mb-5 bg-zinc-900/80 border border-zinc-800">
+                  <TabsList className="mb-5 h-auto flex-wrap justify-start gap-1 bg-zinc-900/80 border border-zinc-800 p-1">
                     <TabsTrigger
                       value="overview"
                       className="gap-1.5 text-zinc-400 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
@@ -332,6 +354,31 @@ export default function Home() {
                         </TabsTrigger>
                       );
                     })}
+                    {hasMovies && (
+                      <TabsTrigger
+                        value="preference"
+                        className="gap-1.5 text-zinc-400 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+                      >
+                        <Heart className="h-3.5 w-3.5" />
+                        观影偏好
+                      </TabsTrigger>
+                    )}
+                    {hasMovies && (
+                      <TabsTrigger
+                        value="region"
+                        className="gap-1.5 text-zinc-400 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+                      >
+                        <Globe2 className="h-3.5 w-3.5" />
+                        地区报告
+                      </TabsTrigger>
+                    )}
+                    <TabsTrigger
+                      value="year"
+                      className="gap-1.5 text-zinc-400 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+                    >
+                      <CalendarDays className="h-3.5 w-3.5" />
+                      年度报告
+                    </TabsTrigger>
                     <TabsTrigger
                       value="report"
                       className="gap-1.5 text-zinc-400 data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
@@ -349,6 +396,19 @@ export default function Home() {
                       <ItemExplorer items={results[c]!.items} />
                     </TabsContent>
                   ))}
+                  {hasMovies && (
+                    <TabsContent value="preference">
+                      <MoviePreference items={items} />
+                    </TabsContent>
+                  )}
+                  {hasMovies && (
+                    <TabsContent value="region">
+                      <RegionReport items={items} />
+                    </TabsContent>
+                  )}
+                  <TabsContent value="year">
+                    <YearReport items={items} />
+                  </TabsContent>
                   <TabsContent value="report">
                     <ReportPanel
                       userName={userName}

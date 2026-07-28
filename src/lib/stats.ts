@@ -335,3 +335,187 @@ export function buildAiPayload(
 
   return parts.join("\n").slice(0, 18000);
 }
+
+
+/* ---------------- 扩展分析（年度 / 地区 / 偏好） ---------------- */
+
+const topNCounter = (c: Map<string, number>, n: number) =>
+  [...c.entries()].sort((a, b) => b[1] - a[1]).slice(0, n).map(([name, count]) => ({ name, count }));
+
+export interface YearReport {
+  year: number;
+  total: number;
+  byCategory: { category: Category; count: number }[];
+  ratedCount: number;
+  avgRating: number | null;
+  fiveCount: number;
+  monthly: { month: string; count: number }[];
+  peakMonth: { month: string; count: number } | null;
+  genreTop: { name: string; count: number }[];
+  regionTop: { name: string; count: number }[];
+  creatorTop: { name: string; count: number }[];
+  firstItem: MediaItem | null;
+  lastItem: MediaItem | null;
+  fiveItems: MediaItem[];
+  /** 单月最高连续打卡天数 */
+  maxDayStreak: number;
+  activeDays: number;
+}
+
+export function availableYears(items: MediaItem[]): number[] {
+  const set = new Set<number>();
+  items.forEach((i) => {
+    const y = parseInt(i.date?.slice(0, 4) ?? "", 10);
+    if (y) set.add(y);
+  });
+  return [...set].sort((a, b) => b - a);
+}
+
+export function computeYearReport(items: MediaItem[], year: number): YearReport | null {
+  const list = items.filter((i) => i.date?.startsWith(String(year)));
+  if (!list.length) return null;
+
+  const byCat = new Map<Category, number>();
+  const monthly = new Map<string, number>();
+  const genres = new Map<string, number>();
+  const regions = new Map<string, number>();
+  const creators = new Map<string, number>();
+  const rated = list.filter((i) => i.rating > 0);
+  const five = list.filter((i) => i.rating === 5).sort((a, b) => a.date.localeCompare(b.date));
+
+  const daySet = new Set<string>();
+  list.forEach((i) => {
+    byCat.set(i.category, (byCat.get(i.category) ?? 0) + 1);
+    const m = i.date.slice(5, 7);
+    if (m) monthly.set(m, (monthly.get(m) ?? 0) + 1);
+    i.genres?.forEach((g) => genres.set(g, (genres.get(g) ?? 0) + 1));
+    i.regions?.forEach((r) => regions.set(r, (regions.get(r) ?? 0) + 1));
+    if (i.creator) creators.set(i.creator, (creators.get(i.creator) ?? 0) + 1);
+    if (i.date) daySet.add(i.date);
+  });
+
+  // 最长连续打卡天数
+  const days = [...daySet].sort();
+  let maxStreak = 0;
+  let cur = 1;
+  for (let k = 1; k < days.length; k++) {
+    const prev = new Date(days[k - 1]).getTime();
+    const now = new Date(days[k]).getTime();
+    if (Math.round((now - prev) / 86400000) === 1) {
+      cur += 1;
+    } else {
+      maxStreak = Math.max(maxStreak, cur);
+      cur = 1;
+    }
+  }
+  maxStreak = Math.max(maxStreak, cur, days.length ? 1 : 0);
+
+  const sorted = [...list].sort((a, b) => a.date.localeCompare(b.date));
+  const monthlyRows = [...monthly.entries()]
+    .map(([month, count]) => ({ month, count }))
+    .sort((a, b) => a.month.localeCompare(b.month));
+  const peak = monthlyRows.length
+    ? [...monthlyRows].sort((a, b) => b.count - a.count)[0]
+    : null;
+
+  return {
+    year,
+    total: list.length,
+    byCategory: (["movie", "book", "music"] as Category[])
+      .map((c) => ({ category: c, count: byCat.get(c) ?? 0 }))
+      .filter((r) => r.count > 0),
+    ratedCount: rated.length,
+    avgRating: rated.length
+      ? Math.round((rated.reduce((s, i) => s + i.rating, 0) / rated.length) * 100) / 100
+      : null,
+    fiveCount: five.length,
+    monthly: monthlyRows,
+    peakMonth: peak,
+    genreTop: topNCounter(genres, 6),
+    regionTop: topNCounter(regions, 6),
+    creatorTop: topNCounter(creators, 6),
+    firstItem: sorted[0] ?? null,
+    lastItem: sorted[sorted.length - 1] ?? null,
+    fiveItems: five,
+    maxDayStreak: maxStreak,
+    activeDays: daySet.size,
+  };
+}
+
+export interface RegionStat {
+  name: string;
+  count: number;
+  avg: number | null;
+  five: number;
+  share: number;
+}
+
+export function computeRegionAnalysis(items: MediaItem[]): RegionStat[] {
+  const movies = items.filter((i) => i.category === "movie" && i.regions && i.regions.length);
+  const map = new Map<string, { count: number; sum: number; rated: number; five: number }>();
+  movies.forEach((i) => {
+    i.regions!.forEach((r) => {
+      if (!map.has(r)) map.set(r, { count: 0, sum: 0, rated: 0, five: 0 });
+      const e = map.get(r)!;
+      e.count += 1;
+      if (i.rating > 0) {
+        e.sum += i.rating;
+        e.rated += 1;
+        if (i.rating === 5) e.five += 1;
+      }
+    });
+  });
+  return [...map.entries()]
+    .map(([name, e]) => ({
+      name,
+      count: e.count,
+      avg: e.rated ? Math.round((e.sum / e.rated) * 100) / 100 : null,
+      five: e.five,
+      share: movies.length ? Math.round((e.count / movies.length) * 1000) / 10 : 0,
+    }))
+    .sort((a, b) => b.count - a.count);
+}
+
+export interface GenreStat {
+  name: string;
+  count: number;
+  avg: number | null;
+  five: number;
+}
+
+export function computeGenrePreference(items: MediaItem[]): GenreStat[] {
+  const movies = items.filter((i) => i.category === "movie" && i.genres && i.genres.length);
+  const map = new Map<string, { count: number; sum: number; rated: number; five: number }>();
+  movies.forEach((i) => {
+    i.genres!.forEach((g) => {
+      if (!map.has(g)) map.set(g, { count: 0, sum: 0, rated: 0, five: 0 });
+      const e = map.get(g)!;
+      e.count += 1;
+      if (i.rating > 0) {
+        e.sum += i.rating;
+        e.rated += 1;
+        if (i.rating === 5) e.five += 1;
+      }
+    });
+  });
+  return [...map.entries()]
+    .map(([name, e]) => ({
+      name,
+      count: e.count,
+      avg: e.rated ? Math.round((e.sum / e.rated) * 100) / 100 : null,
+      five: e.five,
+    }))
+    .sort((a, b) => b.count - a.count);
+}
+
+/** 周几打卡分布（0=周日） */
+export function computeWeekdayDist(items: MediaItem[]): { day: string; count: number }[] {
+  const labels = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+  const counter = new Array(7).fill(0) as number[];
+  items.forEach((i) => {
+    if (!i.date) return;
+    const d = new Date(`${i.date}T00:00:00`);
+    if (!isNaN(d.getTime())) counter[d.getDay()] += 1;
+  });
+  return [1, 2, 3, 4, 5, 6, 0].map((idx) => ({ day: labels[idx], count: counter[idx] }));
+}
