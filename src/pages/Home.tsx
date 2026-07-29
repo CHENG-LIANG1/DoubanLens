@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import {
-  Book, CalendarDays, CheckCircle2, Clapperboard, Clock3, FileText, Globe2,
+  Book, CalendarDays, CheckCircle2, Clapperboard, Clock3, Earth, FileText, Globe2,
   Heart, History, LayoutDashboard, Loader2, Music3, RefreshCcw, RotateCcw, XCircle,
   Check, Link2, Share2, X,
 } from "lucide-react";
@@ -18,6 +18,7 @@ import { ReportPanel } from "@/components/ReportPanel";
 import { ShareDialog } from "@/components/ShareDialog";
 import { MoviePreference } from "@/components/MoviePreference";
 import { RegionReport } from "@/components/RegionReport";
+import { RegionGlobe } from "@/components/RegionGlobe";
 import { YearReport } from "@/components/YearReport";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -531,6 +532,12 @@ export default function Home() {
                         地区报告
                       </TabsTrigger>
                     )}
+                    {hasMovies && (
+                      <TabsTrigger value="globe" className={tabCls}>
+                        <Earth className="h-3.5 w-3.5" />
+                        足迹地球
+                      </TabsTrigger>
+                    )}
                     <TabsTrigger value="year" className={tabCls}>
                       <CalendarDays className="h-3.5 w-3.5" />
                       年度报告
@@ -558,6 +565,11 @@ export default function Home() {
                     {hasMovies && (
                       <TabsContent value="region">
                         <RegionReport items={items} />
+                      </TabsContent>
+                    )}
+                    {hasMovies && (
+                      <TabsContent value="globe">
+                        <RegionGlobe items={items} />
                       </TabsContent>
                     )}
                     <TabsContent value="year">
