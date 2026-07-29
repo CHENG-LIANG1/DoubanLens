@@ -78,7 +78,7 @@ export function ItemExplorer({ items }: { items: MediaItem[] }) {
             setShowCount(60);
           }}
           placeholder="搜索标题 / 短评 / 标签 / 作者…"
-          className="h-9 w-64 bg-zinc-900/80 border-zinc-700 text-sm placeholder:text-zinc-600"
+          className="h-9 w-full sm:w-64 bg-zinc-900/80 border-zinc-700 text-sm placeholder:text-zinc-600"
         />
         <Select value={ratingFilter} onValueChange={setRatingFilter}>
           <SelectTrigger className="h-9 w-28 bg-zinc-900/80 border-zinc-700 text-sm">

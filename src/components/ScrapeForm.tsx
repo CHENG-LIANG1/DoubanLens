@@ -27,7 +27,7 @@ export function ScrapeForm({
     <div className="w-full max-w-2xl mx-auto">
       {/* 玻璃输入框 */}
       <div className="glass rounded-2xl border border-zinc-800 p-2 shadow-2xl shadow-emerald-950/30 transition-colors focus-within:border-emerald-700/70">
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <Input
             value={id}
             onChange={(e) => setId(e.target.value)}

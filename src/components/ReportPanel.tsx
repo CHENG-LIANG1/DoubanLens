@@ -119,7 +119,7 @@ export function ReportPanel({
       </div>
 
       {/* 导出操作 */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Button
           variant="outline"
           size="sm"
@@ -144,7 +144,7 @@ export function ReportPanel({
       {/* 报告正文 */}
       <div
         id="report-root"
-        className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6 md:p-8"
+        className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 sm:p-6 md:p-8"
       >
         <Markdown>{localReport}</Markdown>
         {aiMarkdown && (

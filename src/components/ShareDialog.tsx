@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
 import QRCode from "qrcode";
 import { Check, Download, Link2, Loader2, Share2 } from "lucide-react";
@@ -31,13 +31,24 @@ export function ShareDialog({
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [qr, setQr] = useState("");
+  const [previewH, setPreviewH] = useState(480);
   const longRef = useRef<HTMLDivElement>(null);
+  const SCALE = 0.5;
 
   const shareUrl = useMemo(() => {
     const u = new URL(window.location.href);
     u.search = `?id=${encodeURIComponent(doubanId)}`;
     return u.toString();
   }, [doubanId]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    // 测量隐藏的全尺寸长图高度，计算缩放后的精确容器高度
+    const t = setTimeout(() => {
+      if (longRef.current) setPreviewH(Math.ceil(longRef.current.offsetHeight * SCALE) + 4);
+    }, 50);
+    return () => clearTimeout(t);
+  }, [open, qr]);
 
   useEffect(() => {
     if (!open) return;
@@ -112,15 +123,20 @@ export function ShareDialog({
 
         {/* 长图预览 */}
         <div className="flex justify-center rounded-xl border border-zinc-800 bg-zinc-900/40 p-3">
-          <div className="max-h-[380px] overflow-y-auto rounded-lg">
-            <div style={{ transform: "scale(0.52)", transformOrigin: "top center" }}>
-              <ShareLongImage
-                userName={userName}
-                doubanId={doubanId}
-                results={results}
-                qr={qr}
-                shareUrl={shareUrl}
-              />
+          <div
+            className="overflow-y-auto overflow-x-hidden rounded-lg"
+            style={{ width: 640 * SCALE + 8, height: Math.min(previewH, 420) }}
+          >
+            <div style={{ height: previewH, width: 640 * SCALE }}>
+              <div style={{ transform: `scale(${SCALE})`, transformOrigin: "top left", width: 640 }}>
+                <ShareLongImage
+                  userName={userName}
+                  doubanId={doubanId}
+                  results={results}
+                  qr={qr}
+                  shareUrl={shareUrl}
+                />
+              </div>
             </div>
           </div>
         </div>

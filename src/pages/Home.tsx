@@ -256,14 +256,14 @@ export default function Home() {
                 title="重新抓取最新数据"
               >
                 <RefreshCcw className="h-3 w-3" />
-                重新分析
+                <span className="hidden sm:inline">重新分析</span>
               </button>
               <button
                 onClick={reset}
                 className="btn-secondary flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs"
               >
                 <RotateCcw className="h-3 w-3" />
-                换个 ID
+                <span className="hidden sm:inline">换个 ID</span>
               </button>
             </div>
           )}
@@ -272,12 +272,12 @@ export default function Home() {
 
       <div className="relative mx-auto max-w-6xl px-4 pb-20">
         {stage === "idle" && (
-          <div className="pb-16 pt-20 text-center md:pt-28">
+          <div className="pb-14 pt-14 text-center sm:pt-20 md:pt-28">
             <div className="anim-fade-up mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-1.5 text-xs text-emerald-300">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
               书影音三合一 · 基于豆瓣公开档案
             </div>
-            <h1 className="anim-fade-up anim-delay-1 mx-auto max-w-4xl font-display text-5xl font-bold leading-[1.08] tracking-tight md:text-7xl">
+            <h1 className="anim-fade-up anim-delay-1 mx-auto max-w-4xl font-display text-4xl font-bold leading-[1.12] tracking-tight sm:text-5xl md:text-7xl">
               一个 ID，
               <br />
               看穿 TA 的
@@ -439,7 +439,7 @@ export default function Home() {
                       一键生成内容超全的分享长图，或复制链接让好友实时生成同款
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex w-full items-center gap-2 sm:w-auto">
                     <ShareDialog userName={userName} doubanId={doubanId} results={results} />
                     <button
                       onClick={async () => {
@@ -451,7 +451,7 @@ export default function Home() {
                           setTimeout(() => setLinkCopied(false), 2000);
                         } catch { /* ignore */ }
                       }}
-                      className="btn-secondary flex items-center gap-1.5 rounded-full bg-transparent px-4 py-2 text-sm"
+                      className="btn-secondary flex flex-1 items-center justify-center gap-1.5 rounded-full bg-transparent px-4 py-2 text-sm sm:flex-none"
                     >
                       {linkCopied ? (
                         <>
