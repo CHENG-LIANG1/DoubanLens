@@ -44,6 +44,7 @@ export default function Home() {
   const [live, setLive] = useState<Partial<Record<Category, { fetched: number; total: number }>>>({});
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [bannerOff, setBannerOff] = useState(false);
+  const [tab, setTab] = useState("overview");
   const [linkCopied, setLinkCopied] = useState(false);
   const [recents, setRecents] = useState<RecentEntry[]>([]);
   const [cachedId, setCachedId] = useState("");
@@ -505,7 +506,7 @@ export default function Home() {
                     的书影音档案（{stats.reduce((s, x) => s + x.fetched, 0)} 条）
                   </span>
                 </h2>
-                <Tabs defaultValue="overview">
+                <Tabs value={tab} onValueChange={setTab}>
                   <TabsList className="mb-6 h-auto flex-wrap justify-start gap-1 rounded-full border border-zinc-800/80 bg-zinc-900/60 p-1.5">
                     <TabsTrigger value="overview" className={tabCls}>
                       <LayoutDashboard className="h-3.5 w-3.5" />
@@ -550,7 +551,11 @@ export default function Home() {
 
                   <div className="tab-anim">
                     <TabsContent value="overview">
-                      <Overview results={results} stats={stats} />
+                      <Overview
+                        results={results}
+                        stats={stats}
+                        onEnterGlobe={hasMovies ? () => setTab("globe") : undefined}
+                      />
                     </TabsContent>
                     {CATEGORY_ORDER.filter((c) => (results[c]?.fetched ?? 0) > 0).map((c) => (
                       <TabsContent key={c} value={c}>

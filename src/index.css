@@ -147,6 +147,84 @@
   }
 }
 
+/* —— 科幻 HUD —— */
+@keyframes scan-line {
+  0% {
+    transform: translateY(-10%);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(1010%);
+    opacity: 0;
+  }
+}
+@keyframes hud-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+@keyframes radar-sweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 地球容器扫描线 */
+.scanline::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 10%;
+  z-index: 10;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(52, 211, 153, 0.06) 55%,
+    rgba(52, 211, 153, 0.22) 92%,
+    rgba(167, 243, 208, 0.55)
+  );
+  animation: scan-line 5.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* HUD 网格底纹 */
+.hud-grid {
+  background-image:
+    linear-gradient(rgba(52, 211, 153, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(52, 211, 153, 0.04) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+.hud-live-dot {
+  animation: hud-blink 1.6s ease-in-out infinite;
+}
+
+/* 入口卡的雷达光晕 */
+.radar-sweep {
+  background: conic-gradient(
+    from 0deg,
+    rgba(52, 211, 153, 0.35),
+    transparent 22%,
+    transparent
+  );
+  animation: radar-sweep 4.5s linear infinite;
+}
+
 .anim-fade-up {
   animation: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
 }

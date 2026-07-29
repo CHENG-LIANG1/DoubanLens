@@ -11,7 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Book, Clapperboard, Music3, Star } from "lucide-react";
+import { Book, Clapperboard, Crosshair, Music3, Rocket, Star } from "lucide-react";
 import type { Category, CategoryResult, MediaItem } from "@contracts/types";
 import { CATEGORY_LABEL, type CategoryStats } from "@/lib/stats";
 import { CoverImage } from "./CoverImage";
@@ -71,9 +71,12 @@ function RatingBar({ stats }: { stats: CategoryStats }) {
 export function Overview({
   results,
   stats,
+  onEnterGlobe,
 }: {
   results: Partial<Record<Category, CategoryResult | null>>;
   stats: CategoryStats[];
+  /** 有电影数据时提供：点击切到足迹地球 tab */
+  onEnterGlobe?: () => void;
 }) {
   const items = useMemo(
     () =>
@@ -159,6 +162,48 @@ export function Overview({
           </div>
         </div>
       </div>
+
+      {/* 主打功能：足迹地球入口卡 */}
+      {onEnterGlobe && movieStats && (movieStats.regionTop.length ?? 0) > 0 && (
+        <button
+          onClick={onEnterGlobe}
+          className="bento group relative block w-full overflow-hidden rounded-2xl border border-emerald-500/25 bg-zinc-950/80 text-left"
+        >
+          <div className="hud-grid relative flex items-center gap-5 p-5 md:gap-8 md:p-7">
+            {/* 左侧文案 */}
+            <div className="min-w-0 flex-1">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] tracking-wider text-emerald-300">
+                <Crosshair className="h-3 w-3" />
+                主打功能
+              </span>
+              <h3 className="mt-3 font-display text-2xl font-semibold tracking-tight md:text-3xl">
+                <span className="text-shimmer">足迹地球</span>
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+                {movieStats.fetched} 部电影散落在{" "}
+                <b className="text-emerald-300">{movieStats.regionTop.length}</b>{" "}
+                个国家/地区——转动 3D 地球，点亮你的观影版图
+              </p>
+              <span className="mt-4 inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-medium text-emerald-950 shadow-[0_0_24px_rgba(52,211,153,0.35)] transition group-hover:bg-emerald-400 group-hover:shadow-[0_0_32px_rgba(52,211,153,0.5)]">
+                <Rocket className="h-4 w-4" />
+                启动全球扫描
+                <span className="transition-transform group-hover:translate-x-1">→</span>
+              </span>
+            </div>
+            {/* 右侧雷达球装饰 */}
+            <div className="relative mr-2 hidden h-28 w-28 shrink-0 sm:block md:h-36 md:w-36">
+              <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_38%_32%,rgba(52,211,153,0.5),rgba(6,20,14,0.9)_62%)] shadow-[0_0_50px_rgba(52,211,153,0.35),inset_0_0_30px_rgba(52,211,153,0.2)]" />
+              <div className="absolute inset-0 overflow-hidden rounded-full">
+                <div className="radar-sweep absolute inset-0 rounded-full" />
+              </div>
+              <div className="absolute inset-0 rounded-full border border-emerald-400/40" />
+              <div className="absolute left-1/2 top-1/2 h-px w-full -translate-x-1/2 bg-emerald-400/20" />
+              <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-emerald-400/20" />
+              <Crosshair className="absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 text-emerald-300" />
+            </div>
+          </div>
+        </button>
+      )}
 
       {/* 里程碑 */}
       <Milestones items={items} />
