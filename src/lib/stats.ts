@@ -33,6 +33,10 @@ export interface CategoryStats {
 export function normalizeCreators(raw?: string): string[] {
   if (!raw) return [];
   const out = raw
+    // NFKC：统一全/半角与兼容字符
+    .normalize("NFKC")
+    // 零宽字符（空格/连接符/BOM/控制符），\s 和 trim 都清不掉它们
+    .replace(/[\u200B-\u200F\u202A-\u202E\u2060\uFEFF]/g, "")
     .split(/[、,，&＆;；]/)
     .map((s) =>
       s
