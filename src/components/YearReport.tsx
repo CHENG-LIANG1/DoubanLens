@@ -132,7 +132,7 @@ export function YearReport({ items }: { items: MediaItem[] }) {
               <BarChart data={report.monthly} margin={{ left: -20, right: 8 }}>
                 <XAxis dataKey="month" tick={{ fill: "#71717a", fontSize: 11 }} tickLine={false} />
                 <YAxis tick={{ fill: "#71717a", fontSize: 11 }} tickLine={false} axisLine={false} />
-                <ChartTooltip content={<ChartTooltipContent />} />
+                <ChartTooltip cursor={{ fill: "rgba(255,255,255,0.06)" }} content={<ChartTooltipContent />} />
                 <Bar dataKey="count" fill="#34d399" radius={[4, 4, 0, 0]} barSize={18} />
               </BarChart>
             </ChartContainer>

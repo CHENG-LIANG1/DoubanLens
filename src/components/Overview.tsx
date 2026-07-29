@@ -182,7 +182,7 @@ export function Overview({
                 <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
                 <XAxis dataKey="year" tick={{ fill: "#71717a", fontSize: 11 }} tickLine={false} />
                 <YAxis tick={{ fill: "#71717a", fontSize: 11 }} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={tooltipStyle} />
+                <Tooltip contentStyle={tooltipStyle} cursor={{ stroke: "#3f3f46", strokeWidth: 1 }} />
                 <Area type="monotone" dataKey="movie" name="电影" stackId="1" stroke={GREEN} fill="url(#gMovie)" />
                 <Area type="monotone" dataKey="book" name="书籍" stackId="1" stroke="#60a5fa" fill="url(#gBook)" />
                 <Area type="monotone" dataKey="music" name="音乐" stackId="1" stroke="#f472b6" fill="url(#gMusic)" />
@@ -226,7 +226,7 @@ export function Overview({
                     tickLine={false}
                     axisLine={false}
                   />
-                  <Tooltip contentStyle={tooltipStyle} />
+                  <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(255,255,255,0.06)" }} />
                   <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={12}>
                     {movieStats.genreTop.slice(0, 10).map((_, i) => (
                       <Cell key={i} fill={i < 3 ? GREEN : "#3f3f46"} />
@@ -255,7 +255,7 @@ export function Overview({
                     tickLine={false}
                     axisLine={false}
                   />
-                  <Tooltip contentStyle={tooltipStyle} />
+                  <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(255,255,255,0.06)" }} />
                   <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={12} fill="#60a5fa" />
                 </BarChart>
               </ResponsiveContainer>
@@ -270,7 +270,7 @@ export function Overview({
                   <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
                   <XAxis dataKey="decade" tick={{ fill: "#71717a", fontSize: 11 }} tickLine={false} />
                   <YAxis tick={{ fill: "#71717a", fontSize: 11 }} tickLine={false} axisLine={false} />
-                  <Tooltip contentStyle={tooltipStyle} />
+                  <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(255,255,255,0.06)" }} />
                   <Bar dataKey="count" radius={[4, 4, 0, 0]} barSize={20} fill="#f472b6" />
                 </BarChart>
               </ResponsiveContainer>

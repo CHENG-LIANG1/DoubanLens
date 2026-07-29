@@ -132,7 +132,7 @@ export function MoviePreference({ items }: { items: MediaItem[] }) {
                   fillOpacity={0.35}
                   strokeWidth={2}
                 />
-                <ChartTooltip content={<ChartTooltipContent />} />
+                <ChartTooltip cursor={{ fill: "rgba(255,255,255,0.06)" }} content={<ChartTooltipContent />} />
               </RadarChart>
             </ChartContainer>
           </CardContent>
@@ -158,6 +158,7 @@ export function MoviePreference({ items }: { items: MediaItem[] }) {
                   axisLine={false}
                 />
                 <ChartTooltip
+                  cursor={{ fill: "rgba(255,255,255,0.06)" }}
                   content={
                     <ChartTooltipContent
                       formatter={(v, _n, item) => (
@@ -188,7 +189,7 @@ export function MoviePreference({ items }: { items: MediaItem[] }) {
             <BarChart data={weekday} margin={{ left: -20, right: 8 }}>
               <XAxis dataKey="day" tick={{ fill: "#71717a", fontSize: 11 }} tickLine={false} />
               <YAxis tick={{ fill: "#71717a", fontSize: 11 }} tickLine={false} axisLine={false} />
-              <ChartTooltip content={<ChartTooltipContent />} />
+              <ChartTooltip cursor={{ fill: "rgba(255,255,255,0.06)" }} content={<ChartTooltipContent />} />
               <Bar dataKey="count" fill="#f472b6" radius={[4, 4, 0, 0]} barSize={28} />
             </BarChart>
           </ChartContainer>
