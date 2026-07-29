@@ -27,6 +27,26 @@ export interface CategoryStats {
   tagTop: { name: string; count: number }[];
 }
 
+/**
+ * 作者/表演者名归一化：拆分合著、去国籍前缀、去 CJK 间空格；同一 item 内去重
+ */
+export function normalizeCreators(raw?: string): string[] {
+  if (!raw) return [];
+  const out = raw
+    .split(/[、,，&＆;；]/)
+    .map((s) =>
+      s
+        .replace(/^[【\[（(][^\]）)】]{1,6}[】\]）)]\s*/g, "")
+        .replace(/([\u3400-\u9fff\u3040-\u30ff])\s+(?=[\u3400-\u9fff\u3040-\u30ff])/g, "$1")
+        .trim(),
+    )
+    .filter(
+      (s) =>
+        s.length >= 2 && !/出版社|出版|公司|集团|书局|编辑部|译林/i.test(s),
+    );
+  return [...new Set(out)];
+}
+
 function topN(counter: Map<string, number>, n: number) {
   return [...counter.entries()]
     .sort((a, b) => b[1] - a[1])
@@ -59,7 +79,7 @@ export function computeStats(category: Category, items: MediaItem[], total: numb
       const d = `${Math.floor(i.year / 10) * 10}s`;
       decades.set(d, (decades.get(d) ?? 0) + 1);
     }
-    if (i.creator) creators.set(i.creator, (creators.get(i.creator) ?? 0) + 1);
+    normalizeCreators(i.creator).forEach((c) => creators.set(c, (creators.get(c) ?? 0) + 1));
     i.tags.forEach((t) => tags.set(t, (tags.get(t) ?? 0) + 1));
   });
 
@@ -390,7 +410,7 @@ export function computeYearReport(items: MediaItem[], year: number): YearReport 
     if (m) monthly.set(m, (monthly.get(m) ?? 0) + 1);
     i.genres?.forEach((g) => genres.set(g, (genres.get(g) ?? 0) + 1));
     i.regions?.forEach((r) => regions.set(r, (regions.get(r) ?? 0) + 1));
-    if (i.creator) creators.set(i.creator, (creators.get(i.creator) ?? 0) + 1);
+    normalizeCreators(i.creator).forEach((c) => creators.set(c, (creators.get(c) ?? 0) + 1));
     if (i.date) daySet.add(i.date);
   });
 
