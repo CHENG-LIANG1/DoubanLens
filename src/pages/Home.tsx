@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router";
 import {
   Book, CalendarDays, CheckCircle2, Clapperboard, Clock3, FileText, Globe2,
   Heart, History, LayoutDashboard, Loader2, Music3, RefreshCcw, RotateCcw, XCircle,
+  Check, Link2, Share2, X,
 } from "lucide-react";
 import type { Category, CategoryResult, MediaItem } from "@contracts/types";
 import { trpc } from "@/providers/trpc";
@@ -41,6 +42,8 @@ export default function Home() {
   const [currentCat, setCurrentCat] = useState<Category | null>(null);
   const [live, setLive] = useState<Partial<Record<Category, { fetched: number; total: number }>>>({});
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [bannerOff, setBannerOff] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [recents, setRecents] = useState<RecentEntry[]>([]);
   const [cachedId, setCachedId] = useState("");
 
@@ -60,6 +63,7 @@ export default function Home() {
     setResults({});
     setLive({});
     setSavedAt(null);
+    setBannerOff(false);
     setDoubanId(id);
 
     for (const cat of CATEGORY_ORDER) {
@@ -412,6 +416,59 @@ export default function Home() {
                 );
               })}
             </div>
+
+            {stage === "done" && hasAnyItem && !bannerOff && (
+              <div className="anim-fade-up relative mb-6 overflow-hidden rounded-2xl border border-emerald-500/25 bg-gradient-to-r from-emerald-950/60 via-zinc-900/80 to-zinc-900/60 p-5">
+                <div className="pointer-events-none absolute -right-10 -top-16 h-40 w-40 rounded-full bg-emerald-500/15 blur-3xl" />
+                <button
+                  onClick={() => setBannerOff(true)}
+                  className="absolute right-3 top-3 rounded-full p-1 text-zinc-600 transition-colors hover:bg-zinc-800 hover:text-zinc-300"
+                  aria-label="关闭"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500 text-emerald-950">
+                    <Share2 className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold text-zinc-100">
+                      分析完成，晒一晒 {userName} 的书影音宇宙
+                    </div>
+                    <div className="mt-0.5 text-xs text-zinc-500">
+                      一键生成内容超全的分享长图，或复制链接让好友实时生成同款
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <ShareDialog userName={userName} doubanId={doubanId} results={results} />
+                    <button
+                      onClick={async () => {
+                        try {
+                          const u = new URL(window.location.href);
+                          u.search = `?id=${encodeURIComponent(doubanId)}`;
+                          await navigator.clipboard.writeText(u.toString());
+                          setLinkCopied(true);
+                          setTimeout(() => setLinkCopied(false), 2000);
+                        } catch { /* ignore */ }
+                      }}
+                      className="btn-secondary flex items-center gap-1.5 rounded-full bg-transparent px-4 py-2 text-sm"
+                    >
+                      {linkCopied ? (
+                        <>
+                          <Check className="h-3.5 w-3.5 text-emerald-400" />
+                          已复制
+                        </>
+                      ) : (
+                        <>
+                          <Link2 className="h-3.5 w-3.5" />
+                          复制链接
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {stage === "done" && !hasAnyItem && (
               <div className="anim-fade-up rounded-2xl border border-zinc-800/80 bg-zinc-900/50 p-10 text-center">
