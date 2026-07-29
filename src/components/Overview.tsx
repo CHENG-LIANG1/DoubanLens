@@ -15,6 +15,7 @@ import { Book, Clapperboard, Music3, Star } from "lucide-react";
 import type { Category, CategoryResult, MediaItem } from "@contracts/types";
 import { CATEGORY_LABEL, type CategoryStats } from "@/lib/stats";
 import { CoverImage } from "./CoverImage";
+import { Milestones } from "./Milestones";
 
 const GREEN = "#34d399";
 const CATEGORY_ICON: Record<Category, typeof Clapperboard> = {
@@ -158,6 +159,9 @@ export function Overview({
           </div>
         </div>
       </div>
+
+      {/* 里程碑 */}
+      <Milestones items={items} />
 
       {/* 活跃度曲线 */}
       {activity.length > 1 && (

@@ -1,5 +1,6 @@
 import { forwardRef, useMemo } from "react";
 import type { Category, CategoryResult, MediaItem } from "@contracts/types";
+import { computeMilestones } from "./Milestones";
 import {
   allItems,
   availableYears,
@@ -134,6 +135,7 @@ export const ShareLongImage = forwardRef<HTMLDivElement, LongImageProps>(
     const latestYear = availableYears(items)[0];
     const yearReport = latestYear ? computeYearReport(items, latestYear) : null;
 
+    const milestones = computeMilestones(items);
     const recent = [...items].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
     const movieStats = stats.find((s) => s.category === "movie");
     const today = new Date().toLocaleDateString("zh-CN");
@@ -232,6 +234,54 @@ export const ShareLongImage = forwardRef<HTMLDivElement, LongImageProps>(
                     count={a.count}
                     max={Math.max(...activity.map((x) => x.count))}
                   />
+                ))}
+              </div>
+            </Section>
+          )}
+
+          {/* 里程碑 */}
+          {milestones.length > 0 && (
+            <Section title="标记里程碑">
+              <div className="grid grid-cols-3 gap-2">
+                {milestones.slice(0, 9).map((m) => (
+                  <div
+                    key={m.n}
+                    className={`flex items-center gap-2 rounded-lg border p-2 ${
+                      m.special === "love"
+                        ? "border-pink-500/40 bg-pink-500/5"
+                        : m.special === "round"
+                          ? "border-emerald-500/40 bg-emerald-500/5"
+                          : "border-zinc-800 bg-zinc-900/50"
+                    }`}
+                  >
+                    <div className="h-12 w-8 shrink-0 overflow-hidden rounded">
+                      {m.item.cover ? (
+                        <img
+                          src={`/api/img?url=${encodeURIComponent(m.item.cover)}`}
+                          alt={m.item.mainTitle}
+                          className="h-full w-full object-cover"
+                          crossOrigin="anonymous"
+                        />
+                      ) : (
+                        <div className="h-full w-full bg-zinc-800" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div
+                        className={`num text-sm font-bold leading-none ${
+                          m.special === "love"
+                            ? "text-pink-300"
+                            : m.special === "round"
+                              ? "text-emerald-300"
+                              : "text-zinc-200"
+                        }`}
+                      >
+                        第 {m.n} 部
+                      </div>
+                      <div className="mt-1 truncate text-[10px] text-zinc-400">{m.item.mainTitle}</div>
+                      <div className="text-[9px] text-zinc-600">{m.item.date}</div>
+                    </div>
+                  </div>
                 ))}
               </div>
             </Section>
