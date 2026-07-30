@@ -1,3 +1,8 @@
-// 显式文件路由，确保 Vercel 一定生成
-// /api/trpc/douban.scrapeChunk 对应的 Serverless Function。
-export { config, default } from "../index";
+import app from "../app";
+
+// 使用 Vercel 原生 Fetch Handler，不经过 Node req/res 适配层。
+export const config = {
+  maxDuration: 60,
+};
+
+export default app;

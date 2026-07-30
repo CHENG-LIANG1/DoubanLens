@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import app from "./app";
+import scrapeFunction from "./trpc/douban.scrapeChunk";
+import analyzeFunction from "./trpc/douban.analyze";
+import imageFunction from "./img";
 
 describe("Vercel API routing", () => {
   it("returns tRPC JSON instead of an HTML platform 404", async () => {
@@ -43,5 +46,11 @@ describe("Vercel API routing", () => {
       "api/img.ts": { maxDuration: 60 },
       "api/health.ts": { maxDuration: 10 },
     });
+  });
+
+  it("exports native Fetch handlers without a req/res adapter", () => {
+    expect(scrapeFunction.fetch).toBeTypeOf("function");
+    expect(analyzeFunction.fetch).toBeTypeOf("function");
+    expect(imageFunction.fetch).toBeTypeOf("function");
   });
 });

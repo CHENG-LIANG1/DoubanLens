@@ -1,2 +1,7 @@
-// 显式文件路由，确保封面代理不依赖 rewrite。
-export { config, default } from "./index";
+import app from "./app";
+
+export const config = {
+  maxDuration: 60,
+};
+
+export default app;
