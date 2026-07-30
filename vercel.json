@@ -5,19 +5,5 @@
   "outputDirectory": "dist/public",
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
-  ],
-  "functions": {
-    "api/trpc/douban.scrapeChunk.ts": {
-      "maxDuration": 60
-    },
-    "api/trpc/douban.analyze.ts": {
-      "maxDuration": 60
-    },
-    "api/img.ts": {
-      "maxDuration": 60
-    },
-    "api/health.ts": {
-      "maxDuration": 10
-    }
-  }
+  ]
 }

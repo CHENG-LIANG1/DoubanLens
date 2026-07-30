@@ -40,12 +40,9 @@ describe("Vercel API routing", () => {
     expect(config.rewrites).not.toContainEqual(
       expect.objectContaining({ source: "/api/:path*" }),
     );
-    expect(config.functions).toMatchObject({
-      "api/trpc/douban.scrapeChunk.ts": { maxDuration: 60 },
-      "api/trpc/douban.analyze.ts": { maxDuration: 60 },
-      "api/img.ts": { maxDuration: 60 },
-      "api/health.ts": { maxDuration: 10 },
-    });
+    // 函数时限由各入口的 `export const config` 声明，避免集中配置
+    // 与 Vercel 的文件发现结果不一致而使整个 deployment 构建失败。
+    expect(config.functions).toBeUndefined();
   });
 
   it("exports native Fetch handlers without a req/res adapter", () => {
