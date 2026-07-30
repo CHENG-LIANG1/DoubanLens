@@ -21,7 +21,9 @@ export default async function handler(
   }
 
   try {
-    await getRequestListener(app.fetch)(request, response);
+    await getRequestListener(app.fetch, {
+      overrideGlobalObjects: false,
+    })(request, response);
   } catch (error) {
     console.error("API initialization failed", error);
     response.statusCode = 500;
