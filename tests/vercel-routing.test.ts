@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import app from "./app";
-import vercelFunction from "./index";
+import app from "../api/app";
+import vercelFunction from "../api/index";
 
 describe("Vercel API routing", () => {
   it("returns tRPC JSON instead of an HTML platform 404", async () => {
