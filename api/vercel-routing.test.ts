@@ -49,8 +49,8 @@ describe("Vercel API routing", () => {
   });
 
   it("exports native Fetch handlers without a req/res adapter", () => {
-    expect(scrapeFunction.fetch).toBeTypeOf("function");
-    expect(analyzeFunction.fetch).toBeTypeOf("function");
-    expect(imageFunction.fetch).toBeTypeOf("function");
+    expect(scrapeFunction).toBeTypeOf("function");
+    expect(analyzeFunction).toBeTypeOf("function");
+    expect(imageFunction).toBeTypeOf("function");
   });
 });
