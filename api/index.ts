@@ -1,4 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { getRequestListener } from "@hono/node-server";
+import app from "./app";
 
 export const config = {
   maxDuration: 60,
@@ -19,10 +21,6 @@ export default async function handler(
   }
 
   try {
-    const [{ getRequestListener }, { default: app }] = await Promise.all([
-      import("@hono/node-server"),
-      import("./app"),
-    ]);
     await getRequestListener(app.fetch)(request, response);
   } catch (error) {
     console.error("API initialization failed", error);
