@@ -1,9 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import app from "./app";
-import scrapeFunction from "./trpc/douban.scrapeChunk";
-import analyzeFunction from "./trpc/douban.analyze";
-import imageFunction from "./img";
+import vercelFunction from "./index";
 
 describe("Vercel API routing", () => {
   it("returns tRPC JSON instead of an HTML platform 404", async () => {
@@ -37,17 +35,27 @@ describe("Vercel API routing", () => {
       functions?: Record<string, unknown>;
     };
 
-    expect(config.rewrites).not.toContainEqual(
-      expect.objectContaining({ source: "/api/:path*" }),
+    expect(config.rewrites).toContainEqual(
+      {
+        source: "/api/:path*",
+        destination: "/api/index",
+      },
     );
-    // 函数时限由各入口的 `export const config` 声明，避免集中配置
-    // 与 Vercel 的文件发现结果不一致而使整个 deployment 构建失败。
-    expect(config.functions).toBeUndefined();
+    expect(config.functions).toEqual({
+      "api/index.ts": { maxDuration: 60 },
+    });
   });
 
-  it("exports native Fetch handlers without a req/res adapter", () => {
-    expect(scrapeFunction).toBeTypeOf("function");
-    expect(analyzeFunction).toBeTypeOf("function");
-    expect(imageFunction).toBeTypeOf("function");
+  it("exports one official Hono Node handler", () => {
+    expect(vercelFunction).toBeTypeOf("function");
+  });
+
+  it("exposes a health route from the same application", async () => {
+    const response = await app.request("/api/health");
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      service: "douban-lens-api",
+    });
   });
 });

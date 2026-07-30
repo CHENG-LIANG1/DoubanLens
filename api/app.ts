@@ -11,6 +11,10 @@ import { createContext } from "./context";
  */
 const app = new Hono<{ Bindings: HttpBindings }>();
 
+app.get("/api/health", (c) =>
+  c.json({ ok: true, service: "douban-lens-api" }),
+);
+
 app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
 app.use("/api/trpc/*", async (c) => {
   return fetchRequestHandler({
